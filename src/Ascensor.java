@@ -5,15 +5,23 @@ public class Ascensor implements Runnable {
     private int pisoActual;
     private Usuario usuarioActual;
     private boolean usuarioDentro;
+    private boolean cerrado;                       // NUEVO
 
     public Ascensor(int pisoActual) {
         this.pisoActual = pisoActual;
         this.usuarioActual = null;
         this.usuarioDentro = false;
+        this.cerrado = false;
     }
 
     public synchronized void llamar(Usuario usuario) {
         usuarios.add(usuario);
+        notifyAll();
+    }
+
+    // NUEVOCAMBIO: "no va a llegar nadie más"
+    public synchronized void cerrar() {
+        cerrado = true;
         notifyAll();
     }
 
@@ -53,9 +61,13 @@ public class Ascensor implements Runnable {
         notifyAll();
     }
 
+    // CAMBIA: devuelve null si no quedan usuarios y el ascensor está cerrado
     public synchronized Usuario siguienteUsuario() throws InterruptedException {
-        while (usuarios.isEmpty()) {
+        while (usuarios.isEmpty() && !cerrado) {
             wait();
+        }
+        if (usuarios.isEmpty()) {
+            return null;
         }
         usuarioActual = usuarios.removeFirst();
         notifyAll();
@@ -76,11 +88,12 @@ public class Ascensor implements Runnable {
         notifyAll();
     }
 
+    // CAMBIOS: sin el límite de 4
     @Override
     public void run() {
         try {
-            for (int i = 0; i < 4; i++) {
-                Usuario u = siguienteUsuario();
+            Usuario u;
+            while ((u = siguienteUsuario()) != null) {
                 irAPiso(u.getPisoOrigen());
                 esperarQueSuba();
                 irAPiso(u.getPisoDestino());
